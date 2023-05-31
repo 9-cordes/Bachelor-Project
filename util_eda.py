@@ -14,7 +14,7 @@ def get_missing_durations(durations, stimulus_presentations):
 
 def create_unit_activity_vectors(units, spike_times, stimulus_presentations) -> np.array:
     """
-    creates the general population Response Matrix with all unit activity vectors
+    creates the general population Response Matrix with all unit activity vectors, stimulus dependent
     """
 
     custom_bins = stimulus_presentations[['start_time', 'stop_time']].to_numpy().flatten()
@@ -56,16 +56,17 @@ def construct_unit_activity_population_response_matrix(units, spike_times, stimu
     M = create_unit_activity_vectors(units, spike_times, stimulus_presentations)
     # plot_unit_activity_vectors(M)
 
-    C = np.corrcoef(np.transpose(M))
+    # comment in the following for the overall Correlation Matrix (all responses mixed, not stimulus specific)
+    # C = np.corrcoef(np.transpose(M))
 
-    fig, axs = plt.subplots(1, 3, figsize=(20,8))
-    fig.tight_layout()
-
-    im0 = axs[0].imshow(C)
-    im1 = axs[1].imshow(C[-5000:, :5000])
-    im2 = axs[2].imshow(C[:200, :200])
-
-    fig.suptitle(t='Representational Similarity (Corr) of all Session Stimuli', fontsize=22)
+    # fig, axs = plt.subplots(1, 3, figsize=(20,8))
+    # fig.tight_layout()
+#
+    # im0 = axs[0].imshow(C)
+    # im1 = axs[1].imshow(C[-5000:, :5000])
+    # im2 = axs[2].imshow(C[:200, :200])
+#
+    # fig.suptitle(t='Representational Similarity (Corr) of all Session Stimuli', fontsize=22)
 
     return M
 
@@ -292,12 +293,12 @@ def average_population_response_over_same_stimulus_presentations(M, image_name, 
 
     prev = 0
     for i, cnt in enumerate(counts):
-        M_avg[:, i] = np.mean(M_image[:, prev : prev + cnt], axis=1)
+        M_avg[:, i] = np.mean(M_image[:, prev: prev + cnt], axis=1)
 
         if i < b:
             # might not be necessary at this point
-            M_avg_active[:, i] = np.mean(M_image_b0[:, prev : prev + cnt], axis=1)
-            M_avg_passive[:, i] = np.mean(M_image_b5[:, prev:prev + cnt], axis= 1)
+            M_avg_active[:, i] = np.mean(M_image_b0[:, prev:prev + cnt], axis=1)
+            M_avg_passive[:, i] = np.mean(M_image_b5[:, prev:prev + cnt], axis=1)
 
         prev += cnt
 
@@ -309,8 +310,8 @@ def average_running_speed_all_stimuli(stimulus_presentations, running_speed, cus
     startTimes = stimulus_presentations['start_time'].to_numpy()
     endTimes = stimulus_presentations['stop_time'].to_numpy()
     if custom_timings is not None:
-        startTimes = custom_timings[:,0]
-        endTimes = custom_timings[:,1]
+        startTimes = custom_timings[:, 0]
+        endTimes = custom_timings[:, 1]
 
     running_timestamps = running_speed['timestamps'].to_numpy()
     speeds = running_speed['speed'].to_numpy()
@@ -506,6 +507,67 @@ def plot_active_vs_passive_RS_running_speed_and_pupil_area_over_time(timings,
     axs[2,1].set_xlabel('time in seconds')
     axs[2,1].set_ylabel('Pupil Area')
     axs[2,1].legend()
+
+    return fig
+
+
+def plot_active_vs_passive_RS_Z_Vector_over_time(timings, C_rd_active, C_rd_passive, across_blocks2,  hit_change_times,
+                                                 miss_change_times, z_t_a, z_t_p, half, vol_x, vol_y):
+
+    fig, axs = plt.subplots(2, 2, figsize=(20,9), gridspec_kw={'width_ratios': [1, 2], 'height_ratios': [5, 2]})
+    fig.tight_layout()
+
+    x = timings
+
+    # plot representational similarity
+
+    axs[0,0].plot(x[:half], C_rd_active[0,:], label='active block')           #[0, :] takes first row of matrix
+    axs[0,0].plot(x[:half], C_rd_passive[0,:], label='passive block')
+    # reward volume:
+    axs[0,0].plot(vol_x, vol_y, label='reward volume', color='darkblue', alpha=0.1)
+    # hit trials
+    axs[0,0].vlines(hit_change_times, 0.05, 0.1, linestyles="solid", colors="limegreen")
+
+    axs[0, 0].grid(axis='x', color='0.95')
+    axs[0,0].set_ylabel('Representational Similarity and reward volume (ml)')
+    axs[0,0].legend()
+
+    axs[0,1].vlines(hit_change_times, 0.05, 0.1, linestyles="solid", colors="limegreen", label='hit trials')
+    axs[0,1].vlines(miss_change_times, 0.00, 0.05, linestyles="solid", colors="red", label='miss trials')
+    axs[0,1].plot(x[:half], C_rd_active[0,:], alpha=0.8, label='active block')
+    axs[0,1].plot(x[half:], across_blocks2[0,:], alpha=0.8, label='passive block')
+    # reward volume
+    axs[0,1].plot(vol_x, vol_y, label='reward volume', color='darkblue', alpha=0.1)
+    # axs[0,1].set_xlabel('time in seconds')
+    axs[0, 1].grid(axis='x', color='0.95')
+    axs[0,1].set_ylabel('Representational Similarity and reward volume (ml)')
+    axs[0,1].legend()
+
+    # axs[1,0].set_title(label='running speed')
+    axs[1,0].plot(x[:half], z_t_a[:, 0], label='running speed active block', color='skyblue')
+    axs[1,0].plot(x[:half], z_t_a[:, 1], label='pupil area active block', color='violet')
+    axs[1,0].plot(x[:half], z_t_p[:, 0], label='running speed passive block', color='steelblue')
+    axs[1,0].plot(x[:half], z_t_p[:, 1], label='pupil area passive block', color='mediumpurple')
+
+    axs[1, 0].axhline(y=0, color='gray', linestyle='--', alpha=0.3)
+    axs[1, 0].grid(axis='x', color='0.95')
+    axs[1,0].set_xlabel('time in seconds')
+    axs[1,0].set_ylabel('behaviour z-scored')
+    axs[1,0].legend()
+
+    # axs[1,1].set_title(label='running speed')
+    axs[1,1].plot(x[:half], z_t_a[:, 0], label='running speed', color='skyblue')
+    axs[1,1].plot(x[:half], z_t_a[:, 1], label='pupil area', color='violet')
+
+    axs[1,1].plot(x[half:], z_t_p[:, 0], color='skyblue')
+    axs[1,1].plot(x[half:], z_t_p[:, 1], color='violet')
+
+    # axs[1,1].axvline(half, c='r')
+    axs[1, 1].axhline(y=0, color='gray', linestyle='--', alpha=0.3)
+    axs[1, 1].grid(axis='x', color='0.95')
+    axs[1,1].set_xlabel('time in seconds')
+    axs[1,1].set_ylabel('behaviour z-scored')
+    axs[1,1].legend()
 
     return fig
 
